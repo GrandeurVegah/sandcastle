@@ -44,6 +44,7 @@
     "format:check": "prettier --check .",
     "prepare": "husky",
     "release": "changeset publish",
+    "gateway": "tsx src/control-plane/inference-gateway/main.ts",
     "sandcastle": "npm run build && tsx .sandcastle/run.ts",
     "test-podman": "npm run build && tsx --env-file=.sandcastle/.env .sandcastle/test-podman.ts",
     "test-vercel": "npm run build && tsx --env-file=.sandcastle/.env .sandcastle/test-vercel.ts",
