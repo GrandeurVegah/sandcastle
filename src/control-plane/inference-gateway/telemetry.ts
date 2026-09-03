@@ -30,14 +30,28 @@ export class InMemoryInferenceTelemetrySink implements InferenceTelemetrySink {
  */
 export class JsonlInferenceTelemetrySink implements InferenceTelemetrySink {
   private directoryReady: Promise<void> | undefined;
+  private writeChain: Promise<void> = Promise.resolve();
 
   constructor(private readonly path: string) {}
 
-  async record(event: InferenceTelemetryEvent): Promise<void> {
-    this.directoryReady ??= mkdir(dirname(this.path), { recursive: true }).then(
-      () => undefined,
-    );
-    await this.directoryReady;
-    await appendFile(this.path, `${JSON.stringify(freezeEvent(event))}\n`, "utf8");
+  record(event: InferenceTelemetryEvent): Promise<void> {
+    const immutableEvent = freezeEvent(event);
+    const write = async (): Promise<void> => {
+      this.directoryReady ??= mkdir(dirname(this.path), {
+        recursive: true,
+      }).then(() => undefined);
+      await this.directoryReady;
+      await appendFile(
+        this.path,
+        `${JSON.stringify(immutableEvent)}\n`,
+        "utf8",
+      );
+    };
+
+    const currentWrite = this.writeChain.then(write, write);
+    // Keep later appends usable after a failed write. The failing record() call
+    // still returns currentWrite and therefore surfaces its error to the caller.
+    this.writeChain = currentWrite.catch(() => undefined);
+    return currentWrite;
   }
 }
