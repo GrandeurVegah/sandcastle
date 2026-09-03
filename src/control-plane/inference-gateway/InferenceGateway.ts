@@ -36,14 +36,16 @@ interface ResponseObservation {
   usage: TokenUsage;
 }
 
-const json = (status: number, body: unknown, headers?: HeadersInit): Response =>
-  new Response(JSON.stringify(body), {
+const json = (status: number, body: unknown, headers?: HeadersInit): Response => {
+  const outputHeaders = new Headers(headers);
+  if (!outputHeaders.has("content-type")) {
+    outputHeaders.set("content-type", "application/json");
+  }
+  return new Response(JSON.stringify(body), {
     status,
-    headers: {
-      "content-type": "application/json",
-      ...Object.fromEntries(new Headers(headers)),
-    },
+    headers: outputHeaders,
   });
+};
 
 const requiredAttribution = (
   headers: Headers,
@@ -93,10 +95,7 @@ const classifyUpstreamFailure = (
   const detail = responseText.toLowerCase();
   if (status === 401 || status === 403) return "AUTHENTICATION_FAILED";
   if (status === 429) return "RATE_LIMITED";
-  if (
-    status === 400 ||
-    status === 413
-  ) {
+  if (status === 400 || status === 413) {
     if (
       detail.includes("context length") ||
       detail.includes("context window") ||
@@ -143,12 +142,6 @@ export const createInferenceGateway = (
       config.requestsPerMinute,
     );
   const allowedModels = new Set(config.allowedModels);
-  const pending = new Set<Promise<void>>();
-
-  const track = (promise: Promise<void>): void => {
-    pending.add(promise);
-    void promise.finally(() => pending.delete(promise));
-  };
 
   const record = async (
     attribution: InferenceAttribution,
@@ -477,7 +470,8 @@ export const createInferenceGateway = (
   return {
     handle,
     async waitForIdle(): Promise<void> {
-      await Promise.all([...pending]);
+      // Non-streaming telemetry is awaited in handle(). Streaming telemetry is
+      // awaited before the proxied stream closes, so there is no detached work.
     },
     budgetSnapshot(): ReturnType<InferenceRequestBudget["snapshot"]> {
       return budget.snapshot(now());
