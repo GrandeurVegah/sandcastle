@@ -57,6 +57,10 @@ export interface InferenceGatewayConfig {
 
 export interface ChatCompletionRequestBody {
   readonly model: string;
+  /** OpenRouter semantic-model fallbacks are rejected by the Task 3 gateway. */
+  readonly models?: readonly string[];
+  /** Presets can alter model/routing behavior and are rejected in Task 3. */
+  readonly preset?: string;
   readonly stream?: boolean;
   readonly tools?: readonly unknown[];
   readonly functions?: readonly unknown[];
