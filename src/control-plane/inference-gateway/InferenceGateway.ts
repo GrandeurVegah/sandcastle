@@ -331,6 +331,29 @@ export const createInferenceGateway = (
       (Array.isArray(body.functions) && body.functions.length > 0);
     const startedAt = now();
 
+    if (body.models !== undefined || body.preset !== undefined) {
+      await record(
+        attribution,
+        requestId,
+        requestedModel,
+        toolSchemaPresent,
+        startedAt,
+        403,
+        "failed",
+        { failureType: "MODEL_NOT_ALLOWED" },
+      );
+      return json(
+        403,
+        {
+          error: {
+            message:
+              "Model fallbacks and presets are not allowed at the inference gateway; semantic model selection belongs to the control plane",
+          },
+        },
+        { [REQUEST_ID_HEADER]: requestId },
+      );
+    }
+
     if (!requestedModel.endsWith(":free") || !allowedModels.has(requestedModel)) {
       await record(
         attribution,
