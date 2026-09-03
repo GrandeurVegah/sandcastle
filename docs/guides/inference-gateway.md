@@ -55,6 +55,8 @@ export OPENROUTER_APP_TITLE="Sandcastle"
 
 The default request limits are conservative free-tier limits. Raise them only when the OpenRouter account state supports a higher allowance.
 
+The default host is loopback. Binding the gateway to a non-loopback interface exposes a process that holds an OpenRouter credential, so only do that behind an appropriate local/container network boundary.
+
 ## Start the gateway
 
 ```bash
@@ -88,6 +90,21 @@ x-sandcastle-request-id
 ```
 
 to proxied responses.
+
+## Model-routing boundary
+
+Task 3 accepts exactly one explicitly selected model per request.
+
+The selected `model` must:
+
+1. appear in `SANDCASTLE_GATEWAY_ALLOWED_MODELS`, and
+2. end in `:free`.
+
+The gateway rejects OpenRouter `models` fallback arrays and `preset` fields. Those mechanisms can change which semantic model ultimately handles the request and therefore belong to the future Sandcastle model router rather than the inference transport layer.
+
+OpenRouter may still perform provider-endpoint failover for the selected model. That remains an OpenRouter responsibility under ADR 0022.
+
+This distinction prevents a request from naming an allowed free model while silently falling back to a different paid model.
 
 ## Pi provider configuration
 
