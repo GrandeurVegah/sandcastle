@@ -23,13 +23,15 @@ const event = (requestId: string): InferenceTelemetryEvent => ({
 });
 
 describe("JsonlInferenceTelemetrySink", () => {
-  it("appends immutable request events as JSONL", async () => {
+  it("appends request events as ordered JSONL even when writes overlap", async () => {
     const directory = await mkdtemp(join(tmpdir(), "sandcastle-gateway-"));
     const path = join(directory, "events", "inference.jsonl");
     try {
       const sink = new JsonlInferenceTelemetrySink(path);
-      await sink.record(event("request-1"));
-      await sink.record(event("request-2"));
+      await Promise.all([
+        sink.record(event("request-1")),
+        sink.record(event("request-2")),
+      ]);
 
       const lines = (await readFile(path, "utf8")).trim().split("\n");
       expect(lines).toHaveLength(2);
