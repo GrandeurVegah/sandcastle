@@ -62,7 +62,11 @@ The gateway does not own:
 
 OpenRouter provider routing remains delegated to OpenRouter.
 
-Only explicit allowlisted model IDs ending in `:free` may pass the Task 3 gateway. This prevents accidental paid-model fallback at the local policy boundary.
+Only explicit allowlisted model IDs ending in `:free` may pass the Task 3 gateway.
+
+OpenRouter's `models` fallback array and `preset` request field are rejected by the gateway. Both can change which semantic model or routing configuration handles the request and therefore belong above this boundary. This prevents a client from presenting an allowlisted free primary model while smuggling a paid or otherwise unapproved fallback into the same inference call.
+
+Provider-endpoint failover for the selected model remains permitted because that is OpenRouter's provider-routing responsibility under ADR 0022.
 
 An allowed upstream attempt consumes the local request budget before the result is known. The counter is not refunded on upstream failure because failed inference attempts may still consume provider request quota.
 
@@ -78,14 +82,16 @@ Telemetry write failures are not intentionally swallowed. In streaming mode the 
 - A gateway restart resets Task 3's in-memory counters; later durable state must reconcile this limitation.
 - The coding-agent harness can remain replaceable as long as it can target the local OpenAI-compatible surface or an equivalent adapter.
 - The existing Sandcastle `pi()` provider is not modified in Task 3 to compensate for the missing Task 2 integration. Pi-to-gateway provider selection remains an explicit integration task.
+- Model-level fallback is deliberately absent until the future semantic router can make that choice transparently and record it as policy.
 
 ## Considered options
 
 1. **Count Sandcastle runs as inference requests** - rejected. A coding-agent run can contain multiple model calls.
 2. **Put request accounting inside `src/Orchestrator.ts`** - rejected. The orchestrator cannot reliably observe individual inference calls made inside the coding-agent process and this would violate the kernel/control-plane boundary.
 3. **Rely only on OpenRouter account limits** - rejected. The fork requires per-run/task/attempt attribution and local hard budgets before requests leave the machine.
-4. **Introduce the full durable database in Task 3** - rejected. Durable workflow state is a separate phase and should not be coupled prematurely to the proxy implementation.
-5. **Use a local OpenAI-compatible gateway with process-local enforcement and append-only telemetry** - chosen.
+4. **Permit OpenRouter model-level fallbacks directly from coding-agent requests** - rejected. That would bypass the future semantic router and could violate the free-only allowlist.
+5. **Introduce the full durable database in Task 3** - rejected. Durable workflow state is a separate phase and should not be coupled prematurely to the proxy implementation.
+6. **Use a local OpenAI-compatible gateway with process-local enforcement and append-only telemetry** - chosen.
 
 ## Architectural rule
 
@@ -96,10 +102,10 @@ coding-agent harness
 local inference gateway  <-- authoritative actual-request accounting
         |
         v
-OpenRouter               <-- provider-endpoint routing
+OpenRouter               <-- provider-endpoint routing only
         |
         v
 explicit allowed :free model
 ```
 
-A higher layer may decide which model to request. It must not bypass the gateway when request-budget enforcement is required.
+A higher layer may decide which model to request. It must not bypass the gateway when request-budget enforcement is required, and it must not encode semantic model fallback inside a gateway-bound inference request.
